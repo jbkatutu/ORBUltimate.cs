@@ -50,6 +50,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private EMA slowEma;
         private SMA volSma;
         private EMA ema15m;
+        private ATR atr;
         
         private double dailyRealizedPnL = 0;
         private int dailyTradeCount = 0;
@@ -105,6 +106,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 DailyLossLimit = 500; DailyProfitTarget = 1000;
                 MaxDailyTrades = 10; MaxConsecutiveLosers = 3; MaxTradesPerSession = 3;
                 BreakoutOffsetTicks = 0;
+                ATRPeriod = 14; ATRMultiplier = 0.5;
 
                 UseMaFilter = true; FastMaPeriod = 9; SlowMaPeriod = 21;
                 UseTwoCandleConfirmation = true;
@@ -139,6 +141,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (UseMaFilter) AddChartIndicator(slowEma);
                 if (UseVolumeFilter) volSma = SMA(Volume, VolumeSmaPeriod);
                 if (Use15MinTrendFilter) ema15m = EMA(BarsArray[1], 21);
+                atr = ATR(ATRPeriod);
             }
         }
 
@@ -314,8 +317,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool volValid = !UseVolumeFilter || (Volume[0] > volSma[0] * VolumeMultiplier);
             bool trendLong = !Use15MinTrendFilter || (ema15m[0] > ema15m[1]);
             bool trendShort = !Use15MinTrendFilter || (ema15m[0] < ema15m[1]);
-            double longTrigger = orbHigh[sIdx] + (BreakoutOffsetTicks * TickSize);
-            double shortTrigger = orbLow[sIdx] - (BreakoutOffsetTicks * TickSize);
+            double dynamicOffset = atr[0] * ATRMultiplier;
+            double longTrigger = orbHigh[sIdx] + dynamicOffset;
+            double shortTrigger = orbLow[sIdx] - dynamicOffset;
 
             if (UseTwoCandleConfirmation)
             {
@@ -413,6 +417,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty, Display(Name="Max Consecutive Losers", Order=7, GroupName="0. Global Settings")] public int MaxConsecutiveLosers { get; set; }
         [NinjaScriptProperty, Display(Name="Max Trades Per Session", Order=8, GroupName="0. Global Settings")] public int MaxTradesPerSession { get; set; }
         [NinjaScriptProperty, Display(Name="Breakout Offset (Ticks)", Order=9, GroupName="0. Global Settings")] public int BreakoutOffsetTicks { get; set; }
+        [NinjaScriptProperty, Display(Name="ATR Period", Order=9.5, GroupName="0. Global Settings")] public int ATRPeriod { get; set; }
+        [NinjaScriptProperty, Display(Name="ATR Multiplier for Offset", Order=9.6, GroupName="0. Global Settings")] public double ATRMultiplier { get; set; }
         
         [NinjaScriptProperty, Display(Name="Use MA Filter", Order=1, GroupName="1. Entry Rules")] public bool UseMaFilter { get; set; }
         [NinjaScriptProperty, Display(Name="Use 2-Candle Confirmation", Order=2, GroupName="1. Entry Rules")] public bool UseTwoCandleConfirmation { get; set; }
