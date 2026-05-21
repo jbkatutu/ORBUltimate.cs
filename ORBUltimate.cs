@@ -119,6 +119,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 OrbBoxColor = Brushes.DodgerBlue;
                 OrbBoxOpacity = 20;
+                OrbBoxOffsetTicks = 0;
+                OffsetLineColor = Brushes.Orange;
                 ShowOrbLabels = true;
                 ShowTradeSignals = true;
             }
@@ -265,9 +267,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     DateTime extendedTime = new DateTime(Time[0].Year, Time[0].Month, Time[0].Day, nextStartTime / 10000, (nextStartTime / 100) % 100, 0);
                     if (extendedTime <= Time[0]) extendedTime = extendedTime.AddDays(1);
 
-                    Draw.VerticalLine(this, "VLine_" + sIdx + "_" + currentDay, Time[0], OrbBoxColor, DashStyleHelper.Dash, 1);
+                    Draw.Line(this, "VLine_" + sIdx + "_" + currentDay, false, Time[0], orbLow[sIdx], Time[0], orbHigh[sIdx], OrbBoxColor, DashStyleHelper.Dash, 1);
                     var orbBox = Draw.Rectangle(this, "ORB_Box_" + sIdx + "_" + currentDay, GetSessionStartTime(start), orbHigh[sIdx], extendedTime, orbLow[sIdx], Brushes.Transparent);
                     if (orbBox != null) { orbBox.AreaBrush = OrbBoxColor; orbBox.AreaOpacity = OrbBoxOpacity; }
+
+                    double offsetHigh = orbHigh[sIdx] + (OrbBoxOffsetTicks * TickSize);
+                    double offsetLow = orbLow[sIdx] - (OrbBoxOffsetTicks * TickSize);
+                    Draw.Line(this, "OffsetHigh_" + sIdx + "_" + currentDay, false, GetSessionStartTime(start), offsetHigh, extendedTime, offsetHigh, OffsetLineColor, DashStyleHelper.Dash, 1);
+                    Draw.Line(this, "OffsetLow_" + sIdx + "_" + currentDay, false, GetSessionStartTime(start), offsetLow, extendedTime, offsetLow, OffsetLineColor, DashStyleHelper.Dash, 1);
 
                     double range = orbHigh[sIdx] - orbLow[sIdx];
                     Draw.Line(this, "Mid_" + sIdx + "_" + currentDay, false, GetSessionStartTime(start), orbLow[sIdx] + (range * 0.5), extendedTime, orbLow[sIdx] + (range * 0.5), OrbBoxColor, DashStyleHelper.Dash, 1);
@@ -428,6 +435,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         [XmlIgnore, Display(Name="ORB Box Color", Order=1, GroupName="7. Visuals")] public Brush OrbBoxColor { get; set; }
         [Browsable(false)] public string OrbBoxColorSerializable { get { return Serialize.BrushToString(OrbBoxColor); } set { OrbBoxColor = Serialize.StringToBrush(value); } }
         [NinjaScriptProperty, Range(1, 100), Display(Name="Box Opacity", Order=2, GroupName="7. Visuals")] public int OrbBoxOpacity { get; set; }
+        [NinjaScriptProperty, Display(Name="ORB Box Offset (Ticks)", Order=5, GroupName="7. Visuals")] public int OrbBoxOffsetTicks { get; set; }
+        [XmlIgnore, Display(Name="Offset Line Color", Order=6, GroupName="7. Visuals")] public Brush OffsetLineColor { get; set; }
+        [Browsable(false)] public string OffsetLineColorSerializable { get { return Serialize.BrushToString(OffsetLineColor); } set { OffsetLineColor = Serialize.StringToBrush(value); } }
         [NinjaScriptProperty, Display(Name="Show Text Labels", Order=3, GroupName="7. Visuals")] public bool ShowOrbLabels { get; set; }
         [NinjaScriptProperty, Display(Name="Show Trade Signals", Order=4, GroupName="7. Visuals")] public bool ShowTradeSignals { get; set; }
         #endregion
