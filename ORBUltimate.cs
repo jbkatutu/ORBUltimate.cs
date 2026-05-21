@@ -108,7 +108,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 UseMaFilter = true; FastMaPeriod = 9; SlowMaPeriod = 21;
                 UseTwoCandleConfirmation = true;
-                UseVolumeFilter = false; VolumeSmaPeriod = 20;
+                UseVolumeFilter = false; VolumeSmaPeriod = 20; VolumeMultiplier = 1.5;
                 UseRetestEntry = true; RetestToleranceTicks = 2;
                 UseFakeOutEntry = true;
                 UseTrailingExit = false;
@@ -311,7 +311,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             bool maLongValid = !UseMaFilter || (fastEma[0] > slowEma[0]);
             bool maShortValid = !UseMaFilter || (fastEma[0] < slowEma[0]);
-            bool volValid = !UseVolumeFilter || (Volume[0] > volSma[0]);
+            bool volValid = !UseVolumeFilter || (Volume[0] > volSma[0] * VolumeMultiplier);
             bool trendLong = !Use15MinTrendFilter || (ema15m[0] > ema15m[1]);
             bool trendShort = !Use15MinTrendFilter || (ema15m[0] < ema15m[1]);
             double longTrigger = orbHigh[sIdx] + (BreakoutOffsetTicks * TickSize);
@@ -420,6 +420,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty, Display(Name="Slow MA Period", Order=4, GroupName="1. Entry Rules")] public int SlowMaPeriod { get; set; }
         [NinjaScriptProperty, Display(Name="Use Volume Filter", Order=5, GroupName="1. Entry Rules")] public bool UseVolumeFilter { get; set; }
         [NinjaScriptProperty, Display(Name="Volume SMA Period", Order=6, GroupName="1. Entry Rules")] public int VolumeSmaPeriod { get; set; }
+        [NinjaScriptProperty, Display(Name="Volume Multiplier", Order=6.5, GroupName="1. Entry Rules")] public double VolumeMultiplier { get; set; }
         [NinjaScriptProperty, Display(Name="Use Retest Entry", Order=7, GroupName="1. Entry Rules")] public bool UseRetestEntry { get; set; }
         [NinjaScriptProperty, Display(Name="Retest Tolerance (Ticks)", Order=8, GroupName="1. Entry Rules")] public int RetestToleranceTicks { get; set; }
         [NinjaScriptProperty, Display(Name="Use Fake-out Reversal", Order=9, GroupName="1. Entry Rules")] public bool UseFakeOutEntry { get; set; }
