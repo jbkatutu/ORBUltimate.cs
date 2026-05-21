@@ -317,7 +317,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool volValid = !UseVolumeFilter || (Volume[0] > volSma[0] * VolumeMultiplier);
             bool trendLong = !Use15MinTrendFilter || (ema15m[0] > ema15m[1]);
             bool trendShort = !Use15MinTrendFilter || (ema15m[0] < ema15m[1]);
-            double dynamicOffset = atr[0] * ATRMultiplier;
+            double dynamicOffset = (double)atr[0] * ATRMultiplier;
             double longTrigger = orbHigh[sIdx] + dynamicOffset;
             double shortTrigger = orbLow[sIdx] - dynamicOffset;
 
