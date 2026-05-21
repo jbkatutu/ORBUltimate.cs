@@ -49,6 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private EMA fastEma;
         private EMA slowEma;
         private SMA volSma;
+        private EMA ema15m;
         
         private double dailyRealizedPnL = 0;
         private int dailyTradeCount = 0;
@@ -111,6 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 UseRetestEntry = true; RetestToleranceTicks = 2;
                 UseFakeOutEntry = true;
                 UseTrailingExit = false;
+                Use15MinTrendFilter = true;
 
                 EnableAsian = false; AsianStart = 160000; AsianEnd = 170000; AsianAtmTemplate = "";
                 EnableLondon = false; LondonStart = 10000; LondonEnd = 20000; LondonAtmTemplate = "";
@@ -124,7 +126,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ShowOrbLabels = true;
                 ShowTradeSignals = true;
             }
-            else if (State == State.Configure) { ResetTrackingArrays(); }
+            else if (State == State.Configure) 
+            { 
+                AddDataSeries(BarsPeriodType.Minute, 15);
+                ResetTrackingArrays(); 
+            }
             else if (State == State.DataLoaded)
             {
                 fastEma = EMA(FastMaPeriod); fastEma.Plots[0].Brush = Brushes.Green;
@@ -132,11 +138,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (UseMaFilter || UseTrailingExit) AddChartIndicator(fastEma);
                 if (UseMaFilter) AddChartIndicator(slowEma);
                 if (UseVolumeFilter) volSma = SMA(Volume, VolumeSmaPeriod);
+                if (Use15MinTrendFilter) ema15m = EMA(BarsArray[1], 21);
             }
         }
 
         protected override void OnBarUpdate()
         {
+            if (BarsInProgress != 0) return;
             if (CurrentBar < Math.Max(BarsRequiredToTrade, VolumeSmaPeriod)) return;
             if (!IsAccountAllowed() || !IsInstrumentAllowed()) return;
 
@@ -304,6 +312,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             bool maLongValid = !UseMaFilter || (fastEma[0] > slowEma[0]);
             bool maShortValid = !UseMaFilter || (fastEma[0] < slowEma[0]);
             bool volValid = !UseVolumeFilter || (Volume[0] > volSma[0]);
+            bool trendLong = !Use15MinTrendFilter || (ema15m[0] > ema15m[1]);
+            bool trendShort = !Use15MinTrendFilter || (ema15m[0] < ema15m[1]);
             double longTrigger = orbHigh[sIdx] + (BreakoutOffsetTicks * TickSize);
             double shortTrigger = orbLow[sIdx] - (BreakoutOffsetTicks * TickSize);
 
@@ -317,8 +327,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (awaitingLongConf[sIdx] && Close[0] <= longTrigger) awaitingLongConf[sIdx] = false;
                 else if (awaitingShortConf[sIdx] && Close[0] >= shortTrigger) awaitingShortConf[sIdx] = false;
 
-                if (awaitingLongConf[sIdx] && High[0] > confPriceThreshold[sIdx] && maLongValid && volValid) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); awaitingLongConf[sIdx] = false; return; }
-                else if (awaitingShortConf[sIdx] && Low[0] < confPriceThreshold[sIdx] && maShortValid && volValid) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); awaitingShortConf[sIdx] = false; return; }
+                if (awaitingLongConf[sIdx] && High[0] > confPriceThreshold[sIdx] && maLongValid && volValid && trendLong) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); awaitingLongConf[sIdx] = false; return; }
+                else if (awaitingShortConf[sIdx] && Low[0] < confPriceThreshold[sIdx] && maShortValid && volValid && trendShort) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); awaitingShortConf[sIdx] = false; return; }
             }
 
             if (!UseTwoCandleConfirmation)
@@ -327,8 +337,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     if (High[0] > longTrigger) fakeOutLong[sIdx] = true;
                     if (Low[0] < shortTrigger) fakeOutShort[sIdx] = true;
-                    if (fakeOutShort[sIdx] && Close[0] > shortTrigger && Close[0] > Open[0] && maLongValid) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); fakeOutShort[sIdx] = false; return; }
-                    if (fakeOutLong[sIdx] && Close[0] < longTrigger && Close[0] < Open[0] && maShortValid) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); fakeOutLong[sIdx] = false; return; }
+                    if (fakeOutShort[sIdx] && Close[0] > shortTrigger && Close[0] > Open[0] && maLongValid && trendLong) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); fakeOutShort[sIdx] = false; return; }
+                    if (fakeOutLong[sIdx] && Close[0] < longTrigger && Close[0] < Open[0] && maShortValid && trendShort) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); fakeOutLong[sIdx] = false; return; }
                 }
                 if (UseRetestEntry)
                 {
@@ -336,13 +346,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (!brokeShort[sIdx] && Close[0] < shortTrigger) brokeShort[sIdx] = true;
                     if (brokeLong[sIdx] && !retestedLong[sIdx] && Low[0] <= longTrigger + (RetestToleranceTicks * TickSize)) retestedLong[sIdx] = true;
                     if (brokeShort[sIdx] && !retestedShort[sIdx] && High[0] >= shortTrigger - (RetestToleranceTicks * TickSize)) retestedShort[sIdx] = true;
-                    if (retestedLong[sIdx] && Close[0] > Open[0] && maLongValid) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); brokeLong[sIdx] = false; retestedLong[sIdx] = false; return; }
-                    if (retestedShort[sIdx] && Close[0] < Open[0] && maShortValid) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); brokeShort[sIdx] = false; retestedShort[sIdx] = false; return; }
+                    if (retestedLong[sIdx] && Close[0] > Open[0] && maLongValid && trendLong) { ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx); brokeLong[sIdx] = false; retestedLong[sIdx] = false; return; }
+                    if (retestedShort[sIdx] && Close[0] < Open[0] && maShortValid && trendShort) { ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx); brokeShort[sIdx] = false; retestedShort[sIdx] = false; return; }
                 }
                 if (!UseRetestEntry && !UseFakeOutEntry)
                 {
-                    if (Close[0] > longTrigger && maLongValid && volValid) ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx);
-                    else if (Close[0] < shortTrigger && maShortValid && volValid) ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx);
+                    if (Close[0] > longTrigger && maLongValid && volValid && trendLong) ExecuteAtm(OrderAction.Buy, atmTemplate, sIdx);
+                    else if (Close[0] < shortTrigger && maShortValid && volValid && trendShort) ExecuteAtm(OrderAction.SellShort, atmTemplate, sIdx);
                 }
             }
         }
@@ -414,6 +424,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty, Display(Name="Retest Tolerance (Ticks)", Order=8, GroupName="1. Entry Rules")] public int RetestToleranceTicks { get; set; }
         [NinjaScriptProperty, Display(Name="Use Fake-out Reversal", Order=9, GroupName="1. Entry Rules")] public bool UseFakeOutEntry { get; set; }
         [NinjaScriptProperty, Display(Name="Use Trailing Exit", Order=1, GroupName="2. Exit Rules")] public bool UseTrailingExit { get; set; }
+        [NinjaScriptProperty, Display(Name="Use 15min Trend Filter", Order=10, GroupName="1. Entry Rules")] public bool Use15MinTrendFilter { get; set; }
         
         [NinjaScriptProperty, Display(Name="Enable Asian", Order=1, GroupName="3. Asian Session")] public bool EnableAsian { get; set; }
         [NinjaScriptProperty, Display(Name="Start Time", Order=2, GroupName="3. Asian Session")] public int AsianStart { get; set; }
